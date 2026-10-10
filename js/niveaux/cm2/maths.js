@@ -1,56 +1,15 @@
 /* CM2 — Mathématiques */
 (function () {
   'use strict';
-  const { rand, pick, nb, qcm, qcmNb, uniques, shuffle, versCarte } = U;
+  const { rand, pick, nb, qcmNb } = U;
 
   /* ================================================================
    * 1. Tables de multiplication
    * ================================================================ */
-  const tables = {
-    id: 'tables',
-    nom: 'Tables de multiplication',
-    icone: '✖️',
-    couleur: '#f97316',
-    description: 'Produits, facteurs manquants et divisions, de ×1 à ×10.',
-    toutes: true,
-    options: [
-      { id: 'tables', type: 'multi', label: 'Quelles tables ?', valeurs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], defaut: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
-    ],
-
-    /** Tous les produits des tables choisies, de ×1 à ×10, tirés sans remise. */
-    quiz(n, o) {
-      return shuffle(produits(o.tables)).slice(0, n).map(([table, b]) => {
-        let a = table;
-        const p = a * b;
-        const t = Math.random();
-        if (t < 0.65) {
-          if (Math.random() < 0.5) [a, b] = [b, a];
-          const inverse = Number(String(p).split('').reverse().join(''));
-          return qcmNb(`${a} × ${b} = ?`, p,
-            [p + a, p - a, p + b, p - b, (a + 1) * b, a * (b + 1), inverse],
-            `${a} × ${b} = ${p}`);
-        }
-        if (t < 0.85) {
-          return qcmNb(`${a} × ? = ${p}`, b, [b + 1, b - 1, b + 2, a],
-            `${a} × ${b} = ${p}, donc le nombre manquant est ${b}.`);
-        }
-        return qcmNb(`${p} ÷ ${a} = ?`, b, [b + 1, b - 1, b + 2, b - 2],
-          `${a} × ${b} = ${p}, donc ${p} ÷ ${a} = ${b}.`);
-      });
-    },
-
-    flashcards(o) {
-      return produits(o.tables).map(([a, b]) => ({ recto: `${a} × ${b}`, verso: String(a * b) }));
-    },
-  };
-
-  function produits(listeTables) {
-    const liste = [];
-    for (const a of listeTables) {
-      for (let b = 1; b <= 10; b++) liste.push([a, b]);
-    }
-    return liste;
-  }
+  const tables = COMMUNS.themeTables({
+    valeurs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    defaut: [2, 3, 4, 5, 6, 7, 8, 9, 10],
+  });
 
   /* ================================================================
    * 2. Calcul rapide (calcul mental)
@@ -211,25 +170,11 @@
     { recto: 'Multiplier par 0,5', verso: 'Multiplier par 0,5, c\'est prendre la moitié.', astuce: '46 × 0,5 = 23' },
   ];
 
-  const calcul = {
-    id: 'calcul',
-    nom: 'Calcul rapide',
-    icone: '⚡',
-    couleur: '#0ea5e9',
+  const calcul = COMMUNS.themeCalcul({
     description: 'Calcul mental : astuces, décimaux, compléments, doubles et moitiés.',
-    options: [
-      { id: 'chrono', type: 'choix', mode: 'quiz', label: 'Chrono par question', valeurs: [0, 10, 15, 30], libelles: ['Sans', '10 s', '15 s', '30 s'], defaut: 15 },
-    ],
-
-    quiz(n) {
-      return uniques(n, () => pick(generateursCalcul)());
-    },
-
-    flashcards() {
-      const exemples = uniques(8, () => pick(generateursCalcul)()).map(versCarte);
-      return methodesCalcul.concat(exemples);
-    },
-  };
+    generateurs: generateursCalcul,
+    methodes: methodesCalcul,
+  });
 
   /* ================================================================
    * 3. Résolution de problèmes
@@ -292,25 +237,11 @@
     { recto: 'Conversions de contenance', verso: '1 L = 100 cL = 1 000 mL' },
   ];
 
-  const versQcm = p => qcm(p.q, p.r, p.f, p.e);
-
-  const problemes = {
-    id: 'problemes',
-    nom: 'Résolution de problèmes',
-    icone: '🧩',
-    couleur: '#10b981',
+  const problemes = COMMUNS.themeProblemes({
     description: 'Durées, monnaie, fractions, proportionnalité, périmètres et aires.',
-    toutes: true,
-
-    quiz(n) {
-      return shuffle(banqueProblemes).slice(0, n).map(versQcm);
-    },
-
-    flashcards() {
-      const exemples = shuffle(banqueProblemes).slice(0, 8).map(p => versCarte(versQcm(p)));
-      return methodesProblemes.concat(exemples);
-    },
-  };
+    banque: banqueProblemes,
+    methodes: methodesProblemes,
+  });
 
   CATALOGUE.ajouterModule('cm2', {
     id: 'maths',
