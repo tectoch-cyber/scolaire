@@ -221,10 +221,12 @@
   }
 
   /* ---------------- Écran de départ (options) ---------------- */
-  // La valeur 0 signifie « Toutes » : uniquement pour les thèmes à liste finie (theme.toutes).
+  const MAX_QUESTIONS = 100;
+
+  // La valeur 0 signifie « Toutes » (plafonné à MAX_QUESTIONS) : uniquement pour les thèmes à liste finie (theme.toutes).
   function definitionsOptions(theme, mode) {
     const nombre = mode === 'quiz'
-      ? { id: 'nombre', type: 'choix', label: 'Nombre de questions', valeurs: [5, 10, 15, 20], defaut: 10 }
+      ? { id: 'nombre', type: 'choix', label: 'Nombre de questions', valeurs: [5, 10, 15, 20, 50, 100], defaut: 10 }
       : { id: 'cartes', type: 'choix', label: 'Nombre de cartes', valeurs: [10, 20, 30], defaut: 20 };
     if (mode !== 'quiz' || theme.toutes) nombre.valeurs.push(0);
     nombre.libelles = nombre.valeurs.map(v => (v === 0 ? 'Toutes' : String(v)));
@@ -324,7 +326,7 @@
 
   /* ---------------- Quiz ---------------- */
   function lancerQuiz(ctx, opts) {
-    const questions = ctx.theme.quiz(opts.nombre || Infinity, opts);
+    const questions = ctx.theme.quiz(Math.min(opts.nombre || MAX_QUESTIONS, MAX_QUESTIONS), opts);
     const s = { i: 0, bonnes: 0, serie: 0, meilleureSerie: 0, erreurs: [], resultats: [] };
     const chrono = opts.chrono || 0;
     afficherQuestion();
