@@ -11,15 +11,16 @@
     nom: 'Tables de multiplication',
     icone: '✖️',
     couleur: '#f97316',
-    description: 'Produits, facteurs manquants et divisions.',
+    description: 'Produits, facteurs manquants et divisions, de ×1 à ×10.',
+    toutes: true,
     options: [
-      { id: 'tables', type: 'multi', label: 'Quelles tables ?', valeurs: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], defaut: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
+      { id: 'tables', type: 'multi', label: 'Quelles tables ?', valeurs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], defaut: [2, 3, 4, 5, 6, 7, 8, 9, 10] },
     ],
 
+    /** Tous les produits des tables choisies, de ×1 à ×10, tirés sans remise. */
     quiz(n, o) {
-      return uniques(n, () => {
-        let a = pick(o.tables);
-        let b = rand(2, 10);
+      return shuffle(produits(o.tables)).slice(0, n).map(([table, b]) => {
+        let a = table;
         const p = a * b;
         const t = Math.random();
         if (t < 0.65) {
@@ -39,13 +40,17 @@
     },
 
     flashcards(o) {
-      const cartes = [];
-      for (const a of o.tables) {
-        for (let b = 2; b <= 10; b++) cartes.push({ recto: `${a} × ${b}`, verso: String(a * b) });
-      }
-      return cartes;
+      return produits(o.tables).map(([a, b]) => ({ recto: `${a} × ${b}`, verso: String(a * b) }));
     },
   };
+
+  function produits(listeTables) {
+    const liste = [];
+    for (const a of listeTables) {
+      for (let b = 1; b <= 10; b++) liste.push([a, b]);
+    }
+    return liste;
+  }
 
   /* ================================================================
    * 2. Calcul rapide (calcul mental)
@@ -295,6 +300,7 @@
     icone: '🧩',
     couleur: '#10b981',
     description: 'Durées, monnaie, fractions, proportionnalité, périmètres et aires.',
+    toutes: true,
 
     quiz(n) {
       return shuffle(banqueProblemes).slice(0, n).map(versQcm);

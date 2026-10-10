@@ -172,10 +172,13 @@
   }
 
   /* ---------------- Écran de départ (options) ---------------- */
+  // La valeur 0 signifie « Toutes » : uniquement pour les thèmes à liste finie (theme.toutes).
   function definitionsOptions(theme, mode) {
     const nombre = mode === 'quiz'
       ? { id: 'nombre', type: 'choix', label: 'Nombre de questions', valeurs: [5, 10, 15, 20], defaut: 10 }
       : { id: 'cartes', type: 'choix', label: 'Nombre de cartes', valeurs: [10, 20, 30], defaut: 20 };
+    if (mode !== 'quiz' || theme.toutes) nombre.valeurs.push(0);
+    nombre.libelles = nombre.valeurs.map(v => (v === 0 ? 'Toutes' : String(v)));
     return [nombre].concat((theme.options || []).filter(o => !o.mode || o.mode === mode));
   }
 
@@ -272,7 +275,7 @@
 
   /* ---------------- Quiz ---------------- */
   function lancerQuiz(ctx, opts) {
-    const questions = ctx.theme.quiz(opts.nombre, opts);
+    const questions = ctx.theme.quiz(opts.nombre || Infinity, opts);
     const s = { i: 0, bonnes: 0, serie: 0, meilleureSerie: 0, erreurs: [] };
     const chrono = opts.chrono || 0;
     afficherQuestion();
@@ -438,7 +441,7 @@
   /* ---------------- Flashcards ---------------- */
   function lancerFlash(ctx, opts, cartesImposees) {
     const revision = !!cartesImposees;
-    const cartes = cartesImposees || U.shuffle(ctx.theme.flashcards(opts)).slice(0, opts.cartes);
+    const cartes = cartesImposees || U.shuffle(ctx.theme.flashcards(opts)).slice(0, opts.cartes || undefined);
     const s = { i: 0, sues: [], aRevoir: [] };
     afficherCarte();
 
