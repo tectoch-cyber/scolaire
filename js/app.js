@@ -33,6 +33,21 @@
 
   const etoilesDe = pct => (pct >= 100 ? 3 : pct >= 80 ? 2 : pct >= 50 ? 1 : 0);
 
+  /** Note sur 20, arrondie au demi-point. */
+  const noteSur20 = (bonnes, total) => (total ? Math.round((bonnes / total) * 40) / 2 : 0);
+
+  function appreciation(note) {
+    if (note >= 18) return 'Excellent ! 🏆';
+    if (note >= 16) return 'Très bien ! 🌟';
+    if (note >= 14) return 'Bien ! 👍';
+    if (note >= 12) return 'Assez bien 🙂';
+    if (note >= 10) return 'Peut mieux faire 💪';
+    return 'À retravailler, courage ! 📚';
+  }
+
+  /** Meilleure note d'un thème (les anciennes sauvegardes n'ont que le pourcentage). */
+  const meilleureNote = sc => (sc.meilleureNote !== undefined ? sc.meilleureNote : sc.meilleur / 5);
+
   function etoiles(n, cls = '') {
     let s = `<span class="stars ${cls}" aria-label="${n} étoile${n > 1 ? 's' : ''} sur 3">`;
     for (let i = 0; i < 3; i++) s += `<span class="star ${i < n ? 'on' : ''}" style="--d:${i * 0.15}s">★</span>`;
@@ -87,6 +102,38 @@
     }
     document.body.appendChild(box);
     setTimeout(() => box.remove(), 3500);
+  }
+
+  /** Barres des dernières notes /20 : la note du jour est étiquetée, les autres au survol. */
+  function graphiqueProgression(historique, parties, couleur) {
+    if (historique.length < 2) {
+      return '<section class="panel"><h2>Ta progression</h2><p class="muted">Rejoue ce quiz pour voir l\'évolution de tes notes ici.</p></section>';
+    }
+    const derniere = historique[historique.length - 1];
+    const ecart = derniere - historique[historique.length - 2];
+    const tendance = ecart > 0 ? `▲ +${U.nb(ecart)} point${ecart > 1 ? 's' : ''} depuis la dernière fois`
+      : ecart < 0 ? `▼ ${U.nb(ecart)} point${ecart < -1 ? 's' : ''} depuis la dernière fois`
+      : '= même note que la dernière fois';
+    const debut = Math.max(0, parties - historique.length);
+    const colonnes = historique.map((n, i) => {
+      const actuelle = i === historique.length - 1;
+      const libelle = actuelle ? 'Aujourd\'hui' : `Partie ${debut + i + 1}`;
+      return `
+        <div class="histo-col ${actuelle ? 'current' : ''}" tabindex="0">
+          <span class="histo-tip">${libelle} : <b>${U.nb(n)}/20</b></span>
+          ${actuelle ? `<span class="histo-val">${U.nb(n)}</span>` : ''}
+          <div class="histo-bar" style="height:${Math.max(n, 0.4) * 5}%"></div>
+        </div>`;
+    }).join('');
+    return `
+      <section class="panel" style="--c:${couleur}">
+        <h2>Ta progression</h2>
+        <p class="muted small">Tes ${historique.length} dernières notes sur 20 · <b class="tendance">${tendance}</b></p>
+        <div class="histo" role="img" aria-label="Notes successives : ${historique.map(n => U.nb(n)).join(', ')} sur 20">
+          <div class="histo-grid"><span>20</span><span>10</span><span>0</span></div>
+          <div class="histo-plot">${colonnes}</div>
+        </div>
+      </section>`;
   }
 
   /* ---------------- Vues de navigation ---------------- */
@@ -152,7 +199,9 @@
           </div>
           <div class="theme-stats">
             ${etoiles(sc ? sc.etoiles : 0)}
-            <span class="muted small">${sc ? `Record : ${sc.meilleur} % · ${sc.parties} partie${sc.parties > 1 ? 's' : ''}` : 'Pas encore joué'}</span>
+            <span class="muted small">${sc
+              ? `${sc.derniereNote !== undefined ? `Dernière note : <b>${U.nb(sc.derniereNote)}/20</b> · ` : ''}Record : ${U.nb(meilleureNote(sc))}/20 · ${sc.parties} partie${sc.parties > 1 ? 's' : ''}`
+              : 'Pas encore joué'}</span>
             ${fl ? `<span class="muted small">🃏 Dernière série : ${fl.sues} / ${fl.total} sues</span>` : ''}
           </div>
           <div class="theme-actions">
@@ -276,23 +325,30 @@
   /* ---------------- Quiz ---------------- */
   function lancerQuiz(ctx, opts) {
     const questions = ctx.theme.quiz(opts.nombre || Infinity, opts);
-    const s = { i: 0, bonnes: 0, serie: 0, meilleureSerie: 0, erreurs: [] };
+    const s = { i: 0, bonnes: 0, serie: 0, meilleureSerie: 0, erreurs: [], resultats: [] };
     const chrono = opts.chrono || 0;
     afficherQuestion();
+
+    function texteNote() {
+      return s.i ? `📝 <b>${U.nb(noteSur20(s.bonnes, s.resultats.length))}</b>/20` : '📝 –/20';
+    }
 
     function afficherQuestion() {
       const q = questions[s.i];
       const n = questions.length;
+      const segments = questions.map((_, j) =>
+        `<span class="${j < s.resultats.length ? (s.resultats[j] ? 'ok' : 'ko') : j === s.i ? 'cur' : ''}"></span>`).join('');
       ecran(`
         <section class="panel quiz" style="--c:${ctx.theme.couleur}">
           <div class="bar-top">
             <span class="muted">Question <b>${s.i + 1}</b> / ${n}</span>
             <span class="pills">
-              <span class="pill" id="p-score" title="Bonnes réponses">✅ ${s.bonnes}</span>
+              <span class="pill note-pill" id="p-note" title="Note en cours, sur 20">${texteNote()}</span>
+              <span class="pill" id="p-score" title="Bonnes réponses / questions répondues">✅ ${s.bonnes}/${s.resultats.length}</span>
               <span class="pill ${s.serie >= 3 ? 'hot' : ''}" id="p-serie" title="Série en cours">🔥 ${s.serie}</span>
             </span>
           </div>
-          <div class="progress"><div style="width:${(s.i / n) * 100}%"></div></div>
+          <div class="segments ${n > 40 ? 'dense' : ''}" aria-hidden="true">${segments}</div>
           ${chrono ? '<div class="timer"><div></div></div>' : ''}
           <div class="question ${q.enonce.length > 50 ? 'long' : ''}">${texte(q.enonce)}</div>
           <div class="choices">
@@ -356,7 +412,14 @@
           s.serie = 0;
           s.erreurs.push({ q, k });
         }
-        $('#p-score').textContent = `✅ ${s.bonnes}`;
+        s.resultats.push(ok);
+        $$('.segments > span')[s.i].className = ok ? 'ok' : 'ko';
+        $('#p-score').textContent = `✅ ${s.bonnes}/${s.resultats.length}`;
+        const $note = $('#p-note');
+        $note.innerHTML = `📝 <b>${U.nb(noteSur20(s.bonnes, s.resultats.length))}</b>/20`;
+        $note.classList.remove('bump');
+        void $note.offsetWidth;
+        $note.classList.add('bump');
         const $serie = $('#p-serie');
         $serie.textContent = `🔥 ${s.serie}`;
         $serie.classList.toggle('hot', s.serie >= 3);
@@ -386,21 +449,26 @@
       const total = questions.length;
       const pct = Math.round((s.bonnes / total) * 100);
       const et = etoilesDe(pct);
+      const note = noteSur20(s.bonnes, total);
       const ancien = etat.scores[ctx.cle];
-      const record = ancien && pct > ancien.meilleur;
+      const record = ancien && note > meilleureNote(ancien);
+      const historique = ((ancien && ancien.historique) || []).concat(note).slice(-10);
       etat.scores[ctx.cle] = {
         meilleur: Math.max(pct, ancien ? ancien.meilleur : 0),
+        meilleureNote: Math.max(note, ancien ? meilleureNote(ancien) : 0),
         etoiles: Math.max(et, ancien ? ancien.etoiles : 0),
         parties: (ancien ? ancien.parties : 0) + 1,
         dernier: pct,
+        derniereNote: note,
+        historique,
       };
       etat.bonnes += s.bonnes;
       sauver();
 
-      const message = pct === 100 ? 'Sans faute, tu es un champion ! 🏆'
-        : pct >= 80 ? 'Très bien joué ! Encore un petit effort pour le sans-faute.'
-        : pct >= 50 ? 'C\'est bien ! Révise les flashcards pour progresser.'
-        : 'Courage ! Entraîne-toi avec les flashcards, puis réessaie.';
+      const message = pct === 100 ? 'Sans faute, tu es un champion !'
+        : pct >= 80 ? 'Encore un petit effort pour le sans-faute.'
+        : pct >= 50 ? 'Révise les flashcards pour progresser.'
+        : 'Entraîne-toi avec les flashcards, puis réessaie.';
 
       const erreurs = s.erreurs.map(({ q, k }) => `
         <li>
@@ -415,13 +483,15 @@
       ecran(`
         <section class="panel result" style="--c:${ctx.theme.couleur}">
           ${etoiles(et, 'big')}
-          <div class="score-big">${s.bonnes} <span>/ ${total}</span></div>
-          <div class="score-pct">${pct} %</div>
+          <div class="note-label">Note finale</div>
+          <div class="score-big">${U.nb(note)}<span>/20</span></div>
+          <div class="appreciation">${appreciation(note)}</div>
+          <div class="score-pct">${s.bonnes} bonne${s.bonnes > 1 ? 's' : ''} réponse${s.bonnes > 1 ? 's' : ''} sur ${total} · ${pct} %</div>
           ${record ? '<div class="badge record">🎖️ Nouveau record !</div>' : ''}
           <p class="result-msg">${message}</p>
           <div class="result-stats">
             <div><b>🔥 ${s.meilleureSerie}</b><span>meilleure série</span></div>
-            <div><b>🏅 ${etat.scores[ctx.cle].meilleur} %</b><span>record</span></div>
+            <div><b>🏅 ${U.nb(etat.scores[ctx.cle].meilleureNote)}/20</b><span>record</span></div>
             <div><b>🎮 ${etat.scores[ctx.cle].parties}</b><span>parties</span></div>
           </div>
           <div class="actions wrap">
@@ -430,6 +500,7 @@
             <a class="btn" href="#/${ctx.niveau.id}/${ctx.module.id}">← Thèmes</a>
           </div>
         </section>
+        ${graphiqueProgression(historique, etat.scores[ctx.cle].parties, ctx.theme.couleur)}
         ${erreurs ? `<section class="panel"><h2>À retenir (${s.erreurs.length})</h2><ul class="erreurs">${erreurs}</ul></section>` : ''}`,
         filDe(ctx, 'Résultat'));
 
