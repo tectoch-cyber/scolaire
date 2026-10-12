@@ -19,7 +19,7 @@ window.U = {
 
   arrondi(x, d = 3) {
     const p = Math.pow(10, d);
-    return Math.round(x * p) / p;
+    return Math.round(x * p) / p + 0; // + 0 : transforme -0 en 0
   },
 
   /** Formate un nombre à la française : 1 234,5 */

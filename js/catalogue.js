@@ -11,6 +11,7 @@ window.CATALOGUE = {
     { id: 'cm1', nom: 'CM1', sousTitre: 'Cours moyen 1',        emoji: '📘', couleur: '#0ea5e9', modules: [] },
     { id: 'cm2', nom: 'CM2', sousTitre: 'Cours moyen 2',        emoji: '🚀', couleur: '#6c5ce7', modules: [] },
     { id: '6e',  nom: '6e',  sousTitre: 'Sixième',              emoji: '🏫', couleur: '#10b981', modules: [] },
+    { id: '5e',  nom: '5e',  sousTitre: 'Cinquième',            emoji: '🧪', couleur: '#ef4444', modules: [] },
   ],
 
   ajouterModule(niveauId, module) {
