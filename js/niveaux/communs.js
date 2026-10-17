@@ -83,15 +83,14 @@ window.COMMUNS = (function () {
     };
   }
 
-  /** Résolution de problèmes : banque d'énoncés { q, r, f, e } + fiches méthode. */
-  function themeProblemes({ description, banque, methodes }) {
+  /**
+   * Thème à banque de questions { q, r, f, e } (r = bonne réponse, f = pièges, e = explication)
+   * + fiches de cours pour les flashcards (complétées par quelques questions de la banque).
+   */
+  function themeBanque({ id, nom, icone, couleur, description, banque, methodes }) {
     const versQcm = p => qcm(p.q, p.r, p.f, p.e);
     return {
-      id: 'problemes',
-      nom: 'Résolution de problèmes',
-      icone: '🧩',
-      couleur: '#10b981',
-      description,
+      id, nom, icone, couleur, description,
       toutes: true,
 
       quiz(n) {
@@ -105,5 +104,13 @@ window.COMMUNS = (function () {
     };
   }
 
-  return { themeTables, themeCalcul, themeProblemes };
+  /** Résolution de problèmes : banque d'énoncés + fiches méthode. */
+  function themeProblemes({ description, banque, methodes }) {
+    return themeBanque({
+      id: 'problemes', nom: 'Résolution de problèmes', icone: '🧩', couleur: '#10b981',
+      description, banque, methodes,
+    });
+  }
+
+  return { themeTables, themeCalcul, themeProblemes, themeBanque };
 })();

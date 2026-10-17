@@ -75,8 +75,29 @@ window.U = {
     return out;
   },
 
-  /** Transforme une question QCM en flashcard. */
+  /**
+   * Question « remettre dans l'ordre » : les mots sont proposés mélangés,
+   * l'élève les touche dans l'ordre. joindre(solution) donne le texte de la bonne réponse.
+   */
+  ordre(enonce, solution, explication, joindre = mots => mots.join(' · ')) {
+    let mots = U.shuffle(solution);
+    for (let i = 0; i < 20 && mots.join('|') === solution.join('|'); i++) mots = U.shuffle(solution);
+    return { type: 'ordre', enonce, mots, solution, reponse: joindre(solution), joindre, explication };
+  },
+
+  /** Recompose une phrase à partir de ses mots (pas d'espace avant le point). */
+  phrase(mots) {
+    return mots.join(' ').replace(/ \./g, '.').replace(/ ([?!])/g, ' $1');
+  },
+
+  /** Texte de la bonne réponse, quel que soit le type de question. */
+  bonneReponse(q) {
+    return q.type === 'ordre' ? q.reponse : q.choix[q.bonne];
+  },
+
+  /** Transforme une question en flashcard. */
   versCarte(q) {
-    return { recto: q.enonce, verso: q.choix[q.bonne], astuce: q.explication };
+    const recto = q.type === 'ordre' ? `${q.enonce}\n${q.mots.join(' · ')}` : q.enonce;
+    return { recto, verso: U.bonneReponse(q), astuce: q.explication };
   },
 };

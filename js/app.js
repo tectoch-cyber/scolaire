@@ -266,14 +266,14 @@
         <div class="start-head">
           <span class="theme-icon big">${theme.icone}</span>
           <div>
-            <span class="kicker">${quiz ? '🎯 Quiz QCM' : '🃏 Flashcards'}</span>
+            <span class="kicker">${quiz ? (theme.astuceQuiz ? '🎯 Quiz' : '🎯 Quiz QCM') : '🃏 Flashcards'}</span>
             <h1>${esc(theme.nom)}</h1>
             <p class="muted">${esc(theme.description)}</p>
           </div>
         </div>
         ${defs.map(d => `<div class="opt"><div class="opt-label">${esc(d.label)}</div>${rendreOption(d, valeurs[d.id])}</div>`).join('')}
         <p class="muted small tip">${quiz
-          ? '⌨️ Astuce : tu peux répondre avec les touches 1 à 4, puis Entrée pour continuer.'
+          ? (theme.astuceQuiz || '⌨️ Astuce : tu peux répondre avec les touches 1 à 4, puis Entrée pour continuer.')
           : '⌨️ Astuce : Espace pour retourner la carte, ← « à revoir », → « je savais ».'}</p>
         <div class="actions">
           <a class="btn" href="#/${ctx.niveau.id}/${ctx.module.id}">← Retour</a>
@@ -338,6 +338,7 @@
     function afficherQuestion() {
       const q = questions[s.i];
       const n = questions.length;
+      const ordre = q.type === 'ordre';
       const segments = questions.map((_, j) =>
         `<span class="${j < s.resultats.length ? (s.resultats[j] ? 'ok' : 'ko') : j === s.i ? 'cur' : ''}"></span>`).join('');
       ecran(`
@@ -352,10 +353,19 @@
           </div>
           <div class="segments ${n > 40 ? 'dense' : ''}" aria-hidden="true">${segments}</div>
           ${chrono ? '<div class="timer"><div></div></div>' : ''}
-          <div class="question ${q.enonce.length > 50 ? 'long' : ''}">${texte(q.enonce)}</div>
+          <div class="question ${ordre || q.enonce.length > 50 ? 'long' : ''}">${texte(q.enonce)}</div>
+          ${ordre ? `
+          <div class="ordre-reponse" aria-live="polite"></div>
+          <div class="ordre-mots">
+            ${q.mots.map((m, k) => `<button type="button" class="mot" data-k="${k}">${esc(m)}</button>`).join('')}
+          </div>
+          <div class="actions ordre-actions">
+            <button type="button" class="btn" id="effacer">↺ Effacer</button>
+            <button type="button" class="btn primary big" id="valider" disabled>Valider ✓</button>
+          </div>` : `
           <div class="choices">
             ${q.choix.map((c, k) => `<button type="button" class="choice" data-k="${k}"><span class="key">${k + 1}</span><span>${esc(c)}</span></button>`).join('')}
-          </div>
+          </div>`}
           <div class="feedback" hidden></div>
           <div class="actions"><button type="button" class="btn primary big" id="suivant" hidden></button></div>
         </section>`,
@@ -371,8 +381,53 @@
       boutons.forEach(b => b.addEventListener('click', () => repondre(+b.dataset.k)));
       $suiv.addEventListener('click', suivant);
 
+      /* --- Question « remettre dans l'ordre » --- */
+      const choisis = [];
+      const $zone = $('.ordre-reponse');
+      const $valider = $('#valider');
+      function majOrdre() {
+        $zone.innerHTML = choisis.length
+          ? choisis.map((k, pos) => `<button type="button" class="mot place" data-pos="${pos}">${esc(q.mots[k])}</button>`).join('')
+          : '<span class="placeholder">Touche les mots dans le bon ordre…</span>';
+        $$('.ordre-mots .mot').forEach(b => { b.classList.toggle('pris', choisis.includes(+b.dataset.k)); b.disabled = choisis.includes(+b.dataset.k); });
+        $valider.disabled = choisis.length !== q.mots.length;
+      }
+      function validerOrdre() {
+        if (repondu || choisis.length !== q.mots.length) return;
+        const essai = choisis.map(k => q.mots[k]);
+        const ok = essai.join('|') === q.solution.join('|');
+        $zone.classList.add(ok ? 'ok' : 'ko');
+        figerOrdre();
+        conclure(ok, q.joindre(essai), false);
+      }
+      function figerOrdre() {
+        $$('.ordre-reponse .mot, .ordre-mots .mot').forEach(b => { b.disabled = true; });
+        $('.ordre-actions').hidden = true;
+      }
+      if (ordre) {
+        $$('.ordre-mots .mot').forEach(b => b.addEventListener('click', () => {
+          if (repondu || choisis.includes(+b.dataset.k)) return;
+          choisis.push(+b.dataset.k);
+          majOrdre();
+        }));
+        $zone.addEventListener('click', e => {
+          const b = e.target.closest('.mot');
+          if (!b || repondu) return;
+          choisis.splice(+b.dataset.pos, 1);
+          majOrdre();
+        });
+        $('#effacer').addEventListener('click', () => { choisis.length = 0; majOrdre(); });
+        $valider.addEventListener('click', validerOrdre);
+        majOrdre();
+      }
+
       surTouche(e => {
         if (!repondu) {
+          if (ordre) {
+            if (e.key === 'Enter') { e.preventDefault(); validerOrdre(); }
+            else if (e.key === 'Backspace' && choisis.length) { e.preventDefault(); choisis.pop(); majOrdre(); }
+            return;
+          }
           const k = '1234'.indexOf(e.key);
           if (k >= 0 && k < boutons.length) repondre(k);
         } else if (e.key === 'Enter' || e.key === ' ') {
@@ -389,7 +444,10 @@
           const r = 1 - (performance.now() - debut) / duree;
           $barre.style.width = Math.max(0, r) * 100 + '%';
           $barre.classList.toggle('low', r < 0.3);
-          if (r <= 0) repondre(-1);
+          if (r <= 0) {
+            if (ordre) { figerOrdre(); conclure(false, null, true); }
+            else repondre(-1);
+          }
         }, 50);
         arreterChrono = () => clearInterval(id);
         nettoyage.push(arreterChrono);
@@ -397,22 +455,27 @@
 
       function repondre(k) {
         if (repondu) return;
-        repondu = true;
-        arreterChrono();
-        const ok = k === q.bonne;
         boutons.forEach((b, j) => {
           b.disabled = true;
           if (j === q.bonne) b.classList.add('correct');
           else if (j === k) b.classList.add('wrong');
           else b.classList.add('dim');
         });
+        conclure(k === q.bonne, k < 0 ? null : q.choix[k], k < 0);
+      }
+
+      /** Comptabilise la réponse (juste ou non) et affiche la correction. */
+      function conclure(ok, reponseEleve, horsDelai) {
+        if (repondu) return;
+        repondu = true;
+        arreterChrono();
         if (ok) {
           s.bonnes++;
           s.serie++;
           s.meilleureSerie = Math.max(s.meilleureSerie, s.serie);
         } else {
           s.serie = 0;
-          s.erreurs.push({ q, k });
+          s.erreurs.push({ q, reponse: reponseEleve });
         }
         s.resultats.push(ok);
         $$('.segments > span')[s.i].className = ok ? 'ok' : 'ko';
@@ -426,11 +489,11 @@
         $serie.textContent = `🔥 ${s.serie}`;
         $serie.classList.toggle('hot', s.serie >= 3);
 
-        const titre = ok ? U.pick(BRAVO) : k < 0 ? '⏰ Temps écoulé !' : U.pick(OUPS);
+        const titre = ok ? U.pick(BRAVO) : horsDelai ? '⏰ Temps écoulé !' : U.pick(OUPS);
         $fb.className = 'feedback ' + (ok ? 'ok' : 'ko');
         $fb.innerHTML =
           `<strong>${titre}</strong>` +
-          (ok ? '' : ` La bonne réponse est <b>${esc(q.choix[q.bonne])}</b>.`) +
+          (ok ? '' : ` La bonne réponse est <b>${esc(U.bonneReponse(q))}</b>.`) +
           (q.explication ? `<p class="expl">💡 ${texte(q.explication)}</p>` : '');
         $fb.hidden = false;
         $suiv.hidden = false;
@@ -472,12 +535,12 @@
         : pct >= 50 ? 'Révise les flashcards pour progresser.'
         : 'Entraîne-toi avec les flashcards, puis réessaie.';
 
-      const erreurs = s.erreurs.map(({ q, k }) => `
+      const erreurs = s.erreurs.map(({ q, reponse }) => `
         <li>
           <div class="err-q">${texte(q.enonce)}</div>
           <div class="err-a">
-            <span class="tag ko">${k < 0 ? 'Pas de réponse' : 'Ta réponse : ' + esc(q.choix[k])}</span>
-            <span class="tag ok">Bonne réponse : ${esc(q.choix[q.bonne])}</span>
+            <span class="tag ko">${reponse === null ? 'Pas de réponse' : 'Ta réponse : ' + esc(reponse)}</span>
+            <span class="tag ok">Bonne réponse : ${esc(U.bonneReponse(q))}</span>
           </div>
           ${q.explication ? `<div class="muted small">💡 ${texte(q.explication)}</div>` : ''}
         </li>`).join('');
